@@ -1,0 +1,91 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+    <div style="margin-bottom: 2rem;">
+        <h2 style="font-size: 2.5rem; margin-bottom: 1rem;" class="title-gradient">Secure Analysis Lab</h2>
+        <p style="color: var(--text-secondary); max-width: 800px; line-height: 1.6;">
+            A production-grade secure search engine that implements <strong>Parameterized Queries</strong> and <strong>Heuristic Anomaly Detection</strong>.
+        </p>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 2.5rem;">
+        <!-- Input Lab -->
+        <section class="glass-card">
+            <h3 style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem; color: var(--accent-cyan);">
+                <i data-lucide="shield-check" size="24"></i> Secure Shield Engine
+            </h3>
+            <form method="POST">
+                <input type="text" name="search_query" class="form-control" placeholder="Test with: ' OR 1=1 --" required>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    <i data-lucide="zap" size="20"></i> Run Analysis & Search
+                </button>
+            </form>
+
+            <!-- Detection Alerts -->
+            {% if is_malicious %}
+            <div style="margin-top: 2rem; background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); padding: 1.5rem; border-radius: 1rem; position: relative; overflow: hidden;">
+                <h4 style="color: var(--danger); margin-bottom: 0.75rem;"><i data-lucide="alert-octagon" size="18" style="vertical-align: middle; margin-right: 0.5rem;"></i> ATTACK DETECTED</h4>
+                <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                    {% for det in detection %}
+                    <p style="margin-bottom: 0.5rem;"><strong>Anomaly:</strong> {{ det }}</p>
+                    {% endfor %}
+                </div>
+                <div style="position: absolute; right: -20px; bottom: -20px; opacity: 0.2;">
+                    <i data-lucide="alert-triangle" size="100" color="var(--danger)"></i>
+                </div>
+            </div>
+            {% endif %}
+
+            <div style="margin-top: 2rem; background: rgba(0,0,0,0.5); padding: 1.5rem; border-radius: 1rem; border: 1px dashed var(--accent-cyan);">
+                <h4 style="margin-bottom: 0.75rem; font-size: 0.9rem; color: var(--text-secondary);">Secure Query Mapping:</h4>
+                <code style="display: block; color: var(--accent-cyan); font-family: 'Space Grotesk', monospace; font-size: 0.85rem;">
+                    {{ query_str if query_str else "SELECT username, email FROM user WHERE username = ?" }}
+                </code>
+                <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.75rem; font-style: italic;">
+                    Input is bound as a parameter, not logic.
+                </p>
+            </div>
+        </section>
+
+        <!-- Output Lab -->
+        <section class="glass-card">
+            <h3 style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                <i data-lucide="table" size="24" color="var(--accent-cyan)"></i> Secure Search Results
+            </h3>
+
+            {% if results %}
+            <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
+                <thead>
+                    <tr style="text-align: left; border-bottom: 1px solid var(--border);">
+                        <th style="padding: 1rem; color: var(--text-secondary);">Username</th>
+                        <th style="padding: 1rem; color: var(--text-secondary);">Email</th>
+                        <th style="padding: 1rem; color: var(--text-secondary);">Defense Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for res in results %}
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 1rem;">{{ res[0] }}</td>
+                        <td style="padding: 1rem;">{{ res[1] }}</td>
+                        <td style="padding: 1rem;"><span class="badge badge-success">Fully Protected</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div style="text-align: center; padding: 4rem 2rem; border: 1px dashed var(--border); border-radius: 1rem; color: var(--text-secondary);">
+                {% if is_malicious %}
+                <i data-lucide="shield-alert" size="48" style="color: var(--danger); margin-bottom: 1.5rem; opacity: 0.5;"></i>
+                <p style="color: var(--danger);">Malicious input blocked by detection engine.</p>
+                <p style="font-size: 0.8rem; margin-top: 0.5rem;">This attempt has been logged for administrative review.</p>
+                {% else %}
+                <i data-lucide="check-circle" size="48" style="color: var(--success); margin-bottom: 1.5rem; opacity: 0.5;"></i>
+                <p>Protected engine initialized. Enter a name to safely search.</p>
+                {% endif %}
+            </div>
+            {% endif %}
+        </section>
+    </div>
+</div>
+{% endblock %}

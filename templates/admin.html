@@ -1,0 +1,151 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+    <div style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: flex-end;">
+        <div>
+            <h2 style="font-size: 2.5rem; margin-bottom: 1rem;" class="title-gradient">Attack Intelligence Dashboard</h2>
+            <p style="color: var(--text-secondary); max-width: 800px; line-height: 1.6;">
+                Real-time monitoring of malicious SQL activity across the network.
+            </p>
+        </div>
+        <div style="display: flex; gap: 1rem;">
+            <div class="glass-card" style="padding: 1rem 1.5rem; text-align: center; border-radius: 1rem;">
+                <h4 style="color: var(--danger); font-size: 1.25rem;">{{ logs|length }}</h4>
+                <span style="font-size: 0.7rem; color: var(--text-secondary);">Total Attacks</span>
+            </div>
+            <div class="glass-card" style="padding: 1rem 1.5rem; text-align: center; border-radius: 1rem;">
+                <h4 style="color: var(--warning); font-size: 1.25rem;">{{ blocked_ips|length }}</h4>
+                <span style="font-size: 0.7rem; color: var(--text-secondary);">Blocked IPs</span>
+            </div>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 2.5rem;">
+        <!-- Attack Logs -->
+        <section class="glass-card">
+            <h3 style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem; color: var(--accent-cyan);">
+                <i data-lucide="activity" size="24"></i> Live Attack Logs
+            </h3>
+
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                    <thead>
+                        <tr style="text-align: left; border-bottom: 1px solid var(--border);">
+                            <th style="padding: 1rem; color: var(--text-secondary);">IP Address</th>
+                            <th style="padding: 1rem; color: var(--text-secondary);">Attack Payload</th>
+                            <th style="padding: 1rem; color: var(--text-secondary);">Time Detected</th>
+                            <th style="padding: 1rem; color: var(--text-secondary);">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="log-body">
+                        {% for log in logs %}
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 1rem;"><code>{{ log.ip_address }}</code></td>
+                            <td style="padding: 1rem;"><code style="color: var(--danger);">{{ log.payload[:15] + "..." if log.payload|length > 15 else log.payload }}</code></td>
+                            <td style="padding: 1rem;">{{ log.timestamp.strftime('%H:%M:%S') }}</td>
+                            <td style="padding: 1rem;">
+                                {% if log.is_blocked %}
+                                <span class="badge badge-danger">Blocked</span>
+                                {% else %}
+                                <span class="badge badge-danger" style="background: rgba(239, 68, 68, 0.1);">Logged</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Visualization -->
+        <section class="glass-card">
+            <h3 style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem; color: var(--accent-cyan);">
+                <i data-lucide="pie-chart" size="24"></i> Threat Analysis
+            </h3>
+
+            <div style="padding: 1rem; height: 300px; position: relative;">
+                <canvas id="attackChart"></canvas>
+            </div>
+
+            <div style="margin-top: 2rem;">
+                <h4 style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-secondary);">Blocked List:</h4>
+                {% for bip in blocked_ips %}
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: rgba(239, 68, 68, 0.1); border-radius: 0.75rem; border: 1px solid rgba(239, 68, 68, 0.2); margin-bottom: 0.5rem;">
+                    <span style="font-family: monospace; color: var(--danger);">{{ bip.ip_address }}</span>
+                    <i data-lucide="lock" size="14" color="var(--danger)"></i>
+                </div>
+                {% else %}
+                <p style="font-size: 0.8rem; color: var(--text-secondary); font-style: italic;">No IP addresses are currently blocked.</p>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+</div>
+
+<script>
+    // Initialize Chart.js
+    const ctx = document.getElementById('attackChart').getContext('2d');
+    const attackChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: {{ labels|tojson }},
+            datasets: [{
+                label: 'Attack Vectors',
+                data: {{ data|tojson }},
+                backgroundColor: [
+                    'rgba(34, 211, 238, 0.6)',
+                    'rgba(129, 140, 248, 0.6)',
+                    'rgba(239, 68, 68, 0.6)',
+                    'rgba(245, 158, 11, 0.6)',
+                    'rgba(16, 185, 129, 0.6)'
+                ],
+                borderColor: [
+                    'rgba(34, 211, 238, 1)',
+                    'rgba(129, 140, 248, 1)',
+                    'rgba(239, 68, 68, 1)',
+                    'rgba(245, 158, 11, 1)',
+                    'rgba(16, 185, 129, 1)'
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { color: '#94a3b8', font: { family: 'Outfit', size: 10 } }
+                }
+            }
+        }
+    });
+
+    // Auto-refresh logs every 10 seconds for "Dynamic" effect
+    setInterval(async () => {
+        try {
+            const response = await fetch('/api/logs');
+            const data = await response.json();
+            const logBody = document.getElementById('log-body');
+            
+            // Limit to 10 for UI clarity
+            logBody.innerHTML = '';
+            data.forEach(log => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid var(--border)';
+                tr.innerHTML = `
+                    <td style="padding: 1rem;"><code>${log.ip}</code></td>
+                    <td style="padding: 1rem;"><code style="color: var(--danger);">${log.payload}</code></td>
+                    <td style="padding: 1rem;">${log.timestamp.split(' ')[1]}</td>
+                    <td style="padding: 1rem;"><span class="badge badge-danger" style="background: rgba(239, 68, 68, 0.1);">Logged</span></td>
+                `;
+                logBody.appendChild(tr);
+            });
+            console.log("Live logs updated", data);
+        } catch (e) {
+            console.error("Polling error:", e);
+        }
+    }, 10000);
+</script>
+{% endblock %}

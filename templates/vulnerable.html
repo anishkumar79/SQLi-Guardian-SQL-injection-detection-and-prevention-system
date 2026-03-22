@@ -1,0 +1,74 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+    <div style="margin-bottom: 2rem;">
+        <h2 style="font-size: 2.5rem; margin-bottom: 1rem;" class="title-gradient">Vulnerability Laboratory (Insecure)</h2>
+        <p style="color: var(--text-secondary); max-width: 800px; line-height: 1.6;">
+            This demonstration shows a vulnerable search field that directly concatenates user input into a SQL query. 
+            <strong>Warning:</strong> Use only for educational purposes.
+        </p>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 2.5rem;">
+        <!-- Input Lab -->
+        <section class="glass-card">
+            <h3 style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem; color: var(--danger);">
+                <i data-lucide="alert-triangle" size="24"></i> Insecure Query Pad
+            </h3>
+            <form method="POST">
+                <input type="text" name="search_query" class="form-control" placeholder="Type a name to search (e.g., ' admin' OR '1'='1' )" required>
+                <button type="submit" class="btn btn-outline" style="border-color: var(--danger); color: var(--danger); width: 100%;">
+                    <i data-lucide="terminal" size="20"></i> Execute Insecure Search
+                </button>
+            </form>
+
+            <div style="margin-top: 2rem; background: rgba(0,0,0,0.5); padding: 1.5rem; border-radius: 1rem; border: 1px dashed rgba(239, 68, 68, 0.4);">
+                <h4 style="margin-bottom: 0.75rem; font-size: 0.9rem; color: var(--text-secondary);">Query Logic:</h4>
+                <code style="display: block; color: var(--danger); font-family: 'Space Grotesk', monospace; font-size: 0.85rem; word-break: break-all;">
+                    {{ query_str if query_str else "SELECT * FROM user WHERE username = '[USER_INPUT]'" }}
+                </code>
+            </div>
+        </section>
+
+        <!-- Output Lab -->
+        <section class="glass-card">
+            <h3 style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                <i data-lucide="database" size="24" color="var(--accent-cyan)"></i> Result Table
+            </h3>
+
+            {% if error %}
+            <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); color: var(--danger); padding: 1rem; border-radius: 0.75rem; margin-bottom: 1.5rem;">
+                <strong>Database Error:</strong> {{ error }}
+            </div>
+            {% endif %}
+
+            {% if results %}
+            <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
+                <thead>
+                    <tr style="text-align: left; border-bottom: 1px solid var(--border);">
+                        <th style="padding: 1rem; color: var(--text-secondary);">Username</th>
+                        <th style="padding: 1rem; color: var(--text-secondary);">Email</th>
+                        <th style="padding: 1rem; color: var(--text-secondary);">Security Tier</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for res in results %}
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 1rem;">{{ res[0] }}</td>
+                        <td style="padding: 1rem;">{{ res[1] }}</td>
+                        <td style="padding: 1rem;"><span class="badge badge-success">Valid Result</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div style="text-align: center; padding: 4rem 2rem; border: 1px dashed var(--border); border-radius: 1rem; color: var(--text-secondary);">
+                <i data-lucide="search-x" size="48" style="opacity: 0.3; margin-bottom: 1.5rem;"></i>
+                <p>No results found for the given input.</p>
+            </div>
+            {% endif %}
+        </section>
+    </div>
+</div>
+{% endblock %}
