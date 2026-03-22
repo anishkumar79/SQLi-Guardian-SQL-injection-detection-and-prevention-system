@@ -62,9 +62,10 @@ with app.app_context():
 # Middleware: IP Blocking Check
 @app.before_request
 def check_blocked_ip():
-    ip = request.remote_addr
+    # In production (like Render), we must use X-Forwarded-For to get the real IP
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
     blocked = BlockedIP.query.filter_by(ip_address=ip).first()
-    if blocked and "/admin" not in request.path: # Allow admin to see dashboard if they are on localhost for demo
+    if blocked and "/admin" not in request.path:
         return f"<h1>ACCESS DENIED</h1><p>Your IP ({ip}) has been blocked due to multiple malicious attempts.</p><p>Reason: {blocked.reason}</p>", 403
 
 # Routes
@@ -104,6 +105,8 @@ def secure_search():
     
     if request.method == "POST":
         user_input = request.form.get("search_query", "")
+        # Get real client IP on Render
+        current_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
         
         # 1. DETECT (The "Smart" part)
         is_malicious, patterns = check_sqli(user_input)
@@ -112,18 +115,18 @@ def secure_search():
             detection = get_explanation(patterns)
             # Log the attack
             log_entry = AttackLog(
-                ip_address=request.remote_addr,
+                ip_address=current_ip,
                 payload=user_input,
                 attack_type=", ".join(detection)
             )
             db.session.add(log_entry)
             
             # Check for repeated attacks from this IP
-            recent_attacks = AttackLog.query.filter_by(ip_address=request.remote_addr).filter(AttackLog.timestamp > datetime.utcnow() - timedelta(minutes=10)).count()
+            recent_attacks = AttackLog.query.filter_by(ip_address=current_ip).filter(AttackLog.timestamp > datetime.utcnow() - timedelta(minutes=10)).count()
             if recent_attacks >= 3:
                 # Block the IP
-                if not BlockedIP.query.filter_by(ip_address=request.remote_addr).first():
-                    new_block = BlockedIP(ip_address=request.remote_addr, reason="Multiple SQLi attempts detected")
+                if not BlockedIP.query.filter_by(ip_address=current_ip).first():
+                    new_block = BlockedIP(ip_address=current_ip, reason="Multiple SQLi attempts detected")
                     db.session.add(new_block)
                 log_entry.is_blocked = True
             
@@ -160,6 +163,19 @@ def admin_dashboard():
     
     return render_template("admin.html", logs=logs, blocked_ips=blocked_ips, labels=labels, data=data)
 
+@app.route("/admin/unblock/<int:ip_id>", methods=["POST"])
+def unblock_ip(ip_id):
+    ip_to_unblock = BlockedIP.query.get_or_404(ip_id)
+    ip_addr = ip_to_unblock.ip_address
+    db.session.delete(ip_to_unblock)
+    # Also update any attack logs for this IP? Maybe not strictly necessary but good for consistency
+    # Update AttackLog entries so they don't show as 'Blocked' in the status column?
+    # AttackLog.query.filter_by(ip_address=ip_addr).update({"is_blocked": False})
+    
+    db.session.commit()
+    flash(f"IP address {ip_addr} has been successfully unblocked.", "success")
+    return redirect(url_for('admin_dashboard'))
+
 @app.route("/api/logs")
 def get_logs_api():
     logs = AttackLog.query.order_by(AttackLog.timestamp.desc()).limit(10).all()
@@ -172,4 +188,7 @@ def get_logs_api():
     return jsonify(log_data)
 
 if __name__ == "__main__":
-    app.run(debug=True, port=8000)
+    # Render provides a PORT environment variable. If not found, default to 8000.
+    port = int(os.environ.get("PORT", 8000))
+    # Host must be 0.0.0.0 to be accessible on Render
+    app.run(host="0.0.0.0", port=port, debug=False)
